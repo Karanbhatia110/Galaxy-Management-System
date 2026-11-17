@@ -1,14 +1,18 @@
 """
 Galaxy Construction Management System - Application Factory
 """
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from app.config import Config
 from app.extensions import jwt, limiter, init_db, db
 
 
 def create_app(config_class=Config):
-    app = Flask(__name__)
+    # Determine the path to frontend build files
+    static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+
+    app = Flask(__name__, static_folder=static_folder, static_url_path="")
     app.config.from_object(config_class)
     app.url_map.strict_slashes = False
 
@@ -85,15 +89,23 @@ def create_app(config_class=Config):
     with app.app_context():
         _create_indexes()
 
-    # Health check
-    @app.route("/")
+    # ── API health check ──
+    @app.route("/api/health")
     def health_check():
         return {"status": "ok", "app": "Galaxy Construction Management API"}, 200
 
-    # Error handlers
+    # ── Serve React frontend ──
+    @app.route("/")
+    def serve_index():
+        return send_from_directory(app.static_folder, "index.html")
+
     @app.errorhandler(404)
     def not_found(error):
-        return {"message": "Resource not found"}, 404
+        """For non-API routes, serve React index.html (SPA fallback)."""
+        from flask import request
+        if request.path.startswith("/api/"):
+            return {"message": "Resource not found"}, 404
+        return send_from_directory(app.static_folder, "index.html")
 
     @app.errorhandler(500)
     def internal_error(error):
