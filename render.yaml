@@ -1,0 +1,55 @@
+# render.yaml — Render Blueprint for Galaxy Construction Management System
+# Docs: https://docs.render.com/blueprint-spec
+
+services:
+  # ──────────── Backend (Flask API) ────────────
+  - type: web
+    name: galaxy-api
+    runtime: python
+    region: singapore  # Closest to India
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: MONGO_URI
+        sync: false  # You'll set this manually
+      - key: MONGO_DB_NAME
+        value: galaxydb
+      - key: FRONTEND_URL
+        sync: false  # Set to your static site URL after deploy
+      - key: JWT_ACCESS_TOKEN_EXPIRES
+        value: "3600"
+      - key: JWT_REFRESH_TOKEN_EXPIRES
+        value: "2592000"
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+
+  # ──────────── Frontend (React Static Site) ────────────
+  - type: web
+    name: galaxy-frontend
+    runtime: static
+    region: singapore
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false  # Set to your backend URL, e.g. https://galaxy-api.onrender.com/api
